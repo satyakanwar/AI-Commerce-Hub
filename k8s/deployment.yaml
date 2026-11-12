@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: postgres}
+  template:
+    metadata:
+      labels: {app: postgres}
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports: [{containerPort: 5432}]
+          env:
+            - name: POSTGRES_USER
+              valueFrom: {secretKeyRef: {name: commerce-secrets, key: POSTGRES_USER}}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: commerce-secrets, key: POSTGRES_PASSWORD}}
+            - name: POSTGRES_DB
+              valueFrom: {secretKeyRef: {name: commerce-secrets, key: POSTGRES_DB}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: mongodb}
+  template:
+    metadata:
+      labels: {app: mongodb}
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:7
+          ports: [{containerPort: 27017}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: product-service}
+  template:
+    metadata:
+      labels: {app: product-service}
+    spec:
+      containers:
+        - name: product-service
+          image: YOUR_DOCKERHUB_USERNAME/commerce-product:1.0
+          ports: [{containerPort: 8000}]
+          env:
+            - name: DATABASE_URL
+              valueFrom: {secretKeyRef: {name: commerce-secrets, key: DATABASE_URL}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: order-service}
+  template:
+    metadata:
+      labels: {app: order-service}
+    spec:
+      containers:
+        - name: order-service
+          image: YOUR_DOCKERHUB_USERNAME/commerce-order:1.0
+          ports: [{containerPort: 8000}]
+          env:
+            - name: DATABASE_URL
+              valueFrom: {secretKeyRef: {name: commerce-secrets, key: DATABASE_URL}}
+            - name: PRODUCT_SERVICE_URL
+              valueFrom: {configMapKeyRef: {name: commerce-config, key: PRODUCT_SERVICE_URL}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: ai-service}
+  template:
+    metadata:
+      labels: {app: ai-service}
+    spec:
+      containers:
+        - name: ai-service
+          image: YOUR_DOCKERHUB_USERNAME/commerce-ai:1.0
+          ports: [{containerPort: 8000}]
+          env:
+            - name: MONGO_URL
+              valueFrom: {configMapKeyRef: {name: commerce-config, key: MONGO_URL}}
+            - name: PRODUCT_SERVICE_URL
+              valueFrom: {configMapKeyRef: {name: commerce-config, key: PRODUCT_SERVICE_URL}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: frontend}
+  template:
+    metadata:
+      labels: {app: frontend}
+    spec:
+      containers:
+        - name: frontend
+          image: YOUR_DOCKERHUB_USERNAME/commerce-frontend:1.0
+          ports: [{containerPort: 80}]

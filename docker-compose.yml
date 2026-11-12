@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: commerce
+      POSTGRES_PASSWORD: commerce_dev_password
+      POSTGRES_DB: commerce
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U commerce -d commerce"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mongodb:
+    image: mongo:7
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  product-service:
+    build: ./services/product
+    environment:
+      DATABASE_URL: postgresql+psycopg://commerce:commerce_dev_password@postgres:5432/commerce
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports: ["8001:8000"]
+
+
+  order-service:
+    build: ./services/order
+    environment:
+      DATABASE_URL: postgresql+psycopg://commerce:commerce_dev_password@postgres:5432/commerce
+      PRODUCT_SERVICE_URL: http://product-service:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      product-service:
+        condition: service_started
+    ports: ["8002:8000"]
+
+  ai-service:
+    build: ./services/ai
+    environment:
+      MONGO_URL: mongodb://mongodb:27017
+      PRODUCT_SERVICE_URL: http://product-service:8000
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      product-service:
+        condition: service_started
+    ports: ["8003:8000"]
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_PRODUCT_API: http://localhost:8001
+      VITE_ORDER_API: http://localhost:8002
+      VITE_AI_API: http://localhost:8003
+    depends_on:
+      - product-service
+      - order-service
+      - ai-service
+    ports: ["5173:80"]
+
+volumes:
+  postgres_data:
+  mongo_data:
